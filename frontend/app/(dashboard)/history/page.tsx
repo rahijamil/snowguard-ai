@@ -193,7 +193,7 @@ export default function HistoryPage() {
         const rows = hazardHistory
           .map((h) => {
             const desc = (h.description || "").replace(/"/g, '""');
-            return `${format(new Date(h.timestamp), "yyyy-MM-dd HH:mm")},"${
+            return `${formatDate(new Date(h.timestamp), "yyyy-MM-dd HH:mm")},"${
               h.hazardType
             }",${h.severity},"${desc}",${h.latitude},${h.longitude}`;
           })
@@ -381,10 +381,10 @@ export default function HistoryPage() {
                           <div className="text-center">
                             <Calendar className="h-5 w-5 text-gray-400 mx-auto mb-1" />
                             <p className="text-xs text-gray-600">
-                              {format(new Date(hazard.timestamp), "MMM dd")}
+                              {formatDate(new Date(hazard.timestamp), "MMM dd")}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {format(new Date(hazard.timestamp), "HH:mm")}
+                              {formatDate(new Date(hazard.timestamp), "HH:mm")}
                             </p>
                           </div>
                           <div>
@@ -448,7 +448,7 @@ export default function HistoryPage() {
               ) : routeHistory.length > 0 ? (
                 <div className="space-y-3">
                   {routeHistory.map((route) => {
-                    const { label, bgColor } = formatSeverity(route.riskScore);
+                    const { label, color } = formatSeverity(route.riskScore);
                     return (
                       <div
                         key={route.id}
@@ -494,7 +494,7 @@ export default function HistoryPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <Badge className={bgColor}>{label}</Badge>
+                          <Badge className={color}>{label}</Badge>
                           <p className="text-sm text-gray-600 mt-1">
                             Risk: {route.riskScore}/100
                           </p>
