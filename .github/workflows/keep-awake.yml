@@ -1,0 +1,57 @@
+name: Keep Render Services Awake
+
+on:
+  schedule:
+    # Runs every 14 minutes (Render sleeps after 15)
+    - cron: "*/14 * * * *"
+  # Allow manual triggering from GitHub UI
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual run"
+        required: false
+        default: "Manual trigger"
+
+jobs:
+  ping-services:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code (not needed but good practice)
+        uses: actions/checkout@v4
+
+      - name: Ping API Gateway
+        run: |
+          echo "Pinging API Gateway..."
+          curl -s -f --max-time 30 https://snowguard-api-gateway.onrender.com/actuator/health \
+          && echo "✅ API Gateway OK" \
+          || echo "❌ API Gateway Failed"
+
+      - name: Ping User Service
+        run: |
+          echo "Pinging User Service..."
+          curl -s -f --max-time 30 https://snowguard-user-service.onrender.com/actuator/health \
+          && echo "✅ User Service OK" \
+          || echo "❌ User Service Failed"
+
+      - name: Ping Hazard Service
+        run: |
+          echo "Pinging Hazard Service..."
+          curl -s -f --max-time 30 https://snowguard-hazard-service.onrender.com/actuator/health \
+          && echo "✅ Hazard Service OK" \
+          || echo "❌ Hazard Service Failed"
+
+      - name: Ping AI Service
+        run: |
+          echo "Pinging AI Service..."
+          curl -s -f --max-time 30 https://snowguard-ai-service.onrender.com/health \
+          && echo "✅ AI Service OK" \
+          || echo "❌ AI Service Failed"
+
+      - name: Log completion
+        run: |
+          echo "================================="
+          echo "All services pinged successfully!"
+          echo "Timestamp: $(date)"
+          echo "================================="
