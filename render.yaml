@@ -1,0 +1,88 @@
+# render.yaml
+services:
+  # API Gateway
+  - type: web
+    name: snowguard-api-gateway
+    env: docker
+    dockerfilePath: ./api-gateway/Dockerfile
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: USER_SERVICE_URL
+        sync: false # Will set manually
+      - key: HAZARD_SERVICE_URL
+        sync: false # Will set manually
+      - key: AI_SERVICE_URL
+        sync: false # Will set manually
+      - key: JWT_SECRET
+        sync: false # Will set manually
+      - key: SPRING_REDIS_HOST
+        sync: false # From Upstash
+      - key: SPRING_REDIS_PORT
+        sync: false # From Upstash
+      - key: SPRING_REDIS_PASSWORD
+        sync: false # From Upstash
+    healthCheckPath: /actuator/health
+
+  # User Service
+  - type: web
+    name: snowguard-user-service
+    env: docker
+    dockerfilePath: ./user-service/Dockerfile
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        sync: false # Use existing PostgreSQL
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false # Use existing PostgreSQL
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false # Use existing PostgreSQL
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: SPRING_REDIS_HOST
+        sync: false # From Upstash
+      - key: SPRING_REDIS_PORT
+        sync: false # From Upstash
+      - key: SPRING_REDIS_PASSWORD
+        sync: false # From Upstash
+    healthCheckPath: /actuator/health
+
+  # Hazard Service
+  - type: web
+    name: snowguard-hazard-service
+    env: docker
+    dockerfilePath: ./hazard-service/Dockerfile
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        sync: false # Use existing PostgreSQL
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false # Use existing PostgreSQL
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false # Use existing PostgreSQL
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: SPRING_REDIS_HOST
+        sync: false # From Upstash
+      - key: SPRING_REDIS_PORT
+        sync: false # From Upstash
+      - key: SPRING_REDIS_PASSWORD
+        sync: false # From Upstash
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: ROUTING_API_KEY
+        sync: false
+    healthCheckPath: /actuator/health
+
+  # AI Service
+  - type: web
+    name: snowguard-ai-service
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Use existing PostgreSQL
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PORT
+        value: 8003
+    healthCheckPath: /health
