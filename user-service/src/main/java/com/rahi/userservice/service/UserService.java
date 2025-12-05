@@ -6,8 +6,8 @@ import com.rahi.userservice.entity.User;
 import com.rahi.userservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
+// import org.springframework.cache.annotation.CacheEvict;
+// import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,7 +76,7 @@ public class UserService {
      * Find by email - SIMPLE CACHE KEY
      * Using #p0 (first parameter) instead of #email
      */
-    @Cacheable(value = "users", key = "#p0")
+    // @Cacheable(value = "users", key = "#p0")
     public Optional<User> findByEmail(String email) {
         log.info("🔍 Finding user by email: {} (checking cache)", email);
         Optional<User> user = userRepository.findByEmail(email);
@@ -88,7 +88,7 @@ public class UserService {
      * Find by ID - SIMPLE CACHE KEY
      * Using #p0 (first parameter) instead of #id
      */
-    @Cacheable(value = "users", key = "#p0")
+    // @Cacheable(value = "users", key = "#p0")
     public Optional<User> findById(Long id) {
         log.info("🔍 Finding user by ID: {} (checking cache)", id);
         Optional<User> user = userRepository.findById(id);
@@ -104,7 +104,7 @@ public class UserService {
      * Update preferences - CLEAR ALL CACHE
      */
     @Transactional
-    @CacheEvict(value = "users", allEntries = true)
+    // @CacheEvict(value = "users", allEntries = true)
     public User updatePreferences(Long userId, AccessibilityPreferences prefs) {
         log.info("🔧 Updating preferences for user ID: {}", userId);
         

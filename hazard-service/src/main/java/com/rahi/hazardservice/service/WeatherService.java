@@ -24,7 +24,7 @@ public class WeatherService {
     @Value("${openweather.api.url:https://api.openweathermap.org/data/2.5/weather}")
     private String apiUrl;
 
-    @Cacheable(value = "weather", key = "#lat + '_' + #lon")
+    // @Cacheable(value = "weather", key = "#lat + '_' + #lon")
     public WeatherData fetchWeather(Double lat, Double lon) {
         try {
             String url = String.format("%s?lat=%s&lon=%s&appid=%s&units=metric",
