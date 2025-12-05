@@ -22,6 +22,10 @@ services:
         sync: false # From Upstash
       - key: SPRING_REDIS_PASSWORD
         sync: false # From Upstash
+      - key: SPRING_REDIS_USERNAME
+        sync: false # From Upstash
+      - key: SPRING_REDIS_SSL
+        sync: false # From Upstash
     healthCheckPath: /actuator/health
 
   # User Service
