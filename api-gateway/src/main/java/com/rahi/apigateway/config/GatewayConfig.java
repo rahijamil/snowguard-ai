@@ -1,5 +1,3 @@
-
-// ===== GatewayConfig.java =====
 package com.rahi.apigateway.config;
 
 import com.rahi.apigateway.filter.AuthenticationFilter;
@@ -32,7 +30,7 @@ public class GatewayConfig {
     public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
         return builder.routes()
                 // ======================================
-                // USER SERVICE - Only /api/users/** (NOT /api/auth/**)
+                // USER SERVICE
                 // ======================================
                 .route("user-service", r -> r
                         .path("/api/users/**")
@@ -55,25 +53,21 @@ public class GatewayConfig {
                 // AI SERVICE
                 // ======================================
                 .route("ai-service", r -> r
-                        .path("/api/chat/**", "/api/safety-analysis/**")
+                        .path("/api/chat/**", "/api/safety-analysis/**", "/api/chat/history/**")
                         .filters(f -> f
                                 .filter(loggingFilter)
                                 .filter(authFilter.apply(new AuthenticationFilter.Config())))
                         .uri(aiServiceUrl))  // Use injected variable
 
-                .route("ai-chat-history", r -> r
-    .path("/api/chat/history/**")
-    .filters(f -> f
-            .filter(loggingFilter)
-            .filter(authFilter.apply(new AuthenticationFilter.Config())))
-    .uri("${services.ai-service.url}"))
-
-.route("ai-route-history", r -> r
-    .path("/api/route/history")
-    .filters(f -> f
-            .filter(loggingFilter)
-            .filter(authFilter.apply(new AuthenticationFilter.Config())))
-    .uri("${services.hazard-service.url}"))
+                // ======================================
+                // ROUTE HISTORY (in hazard service)
+                // ======================================
+                .route("route-history", r -> r
+                        .path("/api/route/history")
+                        .filters(f -> f
+                                .filter(loggingFilter)
+                                .filter(authFilter.apply(new AuthenticationFilter.Config())))
+                        .uri(hazardServiceUrl))  // Use injected variable
 
                 // ======================================
                 // HEALTH CHECKS (No Auth)
