@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     
     # Gemini Configuration (ONLY AI PROVIDER)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     
     # Generation Parameters
     MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "1000"))
