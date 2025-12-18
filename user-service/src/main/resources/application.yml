@@ -1,0 +1,10 @@
+# ===============================================
+# User Service Configuration
+# ===============================================
+
+spring:
+  application:
+    name: user-service
+
+  config:
+    import: ${SPRING_CONFIG_IMPORT:optional:configserver:http://config-service:8888}

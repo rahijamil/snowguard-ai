@@ -1,4 +1,4 @@
-package com.rahi.api_gateway;
+package com.rahi.apigateway;
 
 // import org.junit.jupiter.api.Test;
 // import org.springframework.boot.test.context.SpringBootTest;

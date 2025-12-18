@@ -1,9 +1,9 @@
-// ===== app/(dashboard)/dashboard/page.tsx =====
+// ===== app/(dashboard)/dashboard/page.tsx (UPDATED) =====
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { useHazards } from "@/lib/hooks/use-hazards";
+import { useDashboard } from "@/lib/hooks/use-dashboard";
 import { useLocation } from "@/lib/hooks/use-location";
 import {
   Card,
@@ -26,6 +26,8 @@ import {
   MessageSquare,
   History,
   RefreshCw,
+  Sparkles,
+  Bell,
 } from "lucide-react";
 import { formatSeverity, formatHazardType } from "@/lib/utils/formatters";
 import Link from "next/link";
@@ -37,22 +39,25 @@ export default function DashboardPage() {
     loading: locationLoading,
     error: locationError,
   } = useLocation();
-  const { hazards, loading: hazardsLoading, fetchHazards } = useHazards();
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const { data, loading, error, fetchDashboard, refresh } = useDashboard();
 
+  // Fetch dashboard data when location is available
   useEffect(() => {
     if (location) {
-      fetchHazards(location.lat, location.lon);
-      // setLastUpdate(new Date());
+      fetchDashboard(location.lat, location.lon, 5.0);
     }
-  }, [location, fetchHazards]);
+  }, [location, fetchDashboard]);
 
   const handleRefresh = () => {
     if (location) {
-      fetchHazards(location.lat, location.lon);
-      setLastUpdate(new Date());
+      refresh(location.lat, location.lon, 5.0);
     }
   };
+
+  // Extract data from aggregated response
+  const hazards = data?.hazards;
+  const aiSuggestion = data?.aiSuggestions;
+  const lastUpdate = data?.timestamp ? new Date(data.timestamp) : null;
 
   return (
     <div className="space-y-6">
@@ -60,29 +65,39 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {user?.name || "User"}!
+            Welcome back, {data?.userName || user?.name || "User"}!
           </h1>
           <p className="text-gray-600 mt-1">
             Here&apos;s your winter safety overview
           </p>
         </div>
-        <Button
-          onClick={handleRefresh}
-          variant="outline"
-          disabled={hazardsLoading}
-        >
+        <Button onClick={handleRefresh} variant="outline" disabled={loading}>
           <RefreshCw
-            className={`h-4 w-4 mr-2 ${hazardsLoading ? "animate-spin" : ""}`}
+            className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
           />
           Refresh
         </Button>
       </div>
 
-      {/* Location Error */}
+      {/* Errors */}
       {locationError && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{locationError}</AlertDescription>
+        </Alert>
+      )}
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {data?.error && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{data.error}</AlertDescription>
         </Alert>
       )}
 
@@ -129,6 +144,21 @@ export default function DashboardPage() {
         </Link>
       </div>
 
+      {/* AI Suggestion (if available) */}
+      {aiSuggestion && (
+        <Card className="border-indigo-200 bg-indigo-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-indigo-900">
+              <Sparkles className="h-5 w-5" />
+              AI Safety Suggestion
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-indigo-800">{aiSuggestion}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Current Location */}
       <Card>
         <CardHeader>
@@ -173,7 +203,7 @@ export default function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {hazardsLoading ? (
+          {loading ? (
             <div className="space-y-3">
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
@@ -241,6 +271,33 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Notifications (if available from future notification-service) */}
+      {data?.notifications && data.notifications.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Recent Notifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {data.notifications.map((notification: any, index: number) => (
+                <div
+                  key={index}
+                  className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                >
+                  <p className="text-sm font-medium">{notification.title}</p>
+                  <p className="text-xs text-gray-600">
+                    {notification.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

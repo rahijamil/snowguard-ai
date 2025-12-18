@@ -1,0 +1,57 @@
+# ===============================================
+# User Service Configuration
+# ===============================================
+
+server:
+  port: 8081
+
+spring:
+  application:
+    name: user-service
+  # Database
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/userdb}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    # Redis
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      default:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+  retry:
+    instances:
+      default:
+        max-attempts: 3
+        wait-duration: 1s
+
+# Actuator
+management:
+  endpoints:
+    caches:
+      enabled: true
+
+# Logging
+logging:
+  level:
+    com.rahi.userservice: DEBUG
+    org.springframework.cache: DEBUG
+    org.springframework.data.redis: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO

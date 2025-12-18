@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     ENABLE_CHAT_LOGGING: bool = os.getenv("ENABLE_CHAT_LOGGING", "true").lower() == "true"
     
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "redis")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
+    
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._validate_config()
@@ -65,8 +68,8 @@ class Settings(BaseSettings):
         logger.info(f"✅ Gemini API key configured (model: {self.GEMINI_MODEL})")
     
     class Config:
-        env_file = ".env"
+        env_file = (".env", "/app/.env")  # Check both local .env (dev) and mounted config (swarm)
         case_sensitive = True
-
+        extra = "ignore"  # Ignore environment variables not defined in this class
 
 settings = Settings()

@@ -3,6 +3,9 @@ package com.rahi.hazardservice.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rahi.hazardservice.dto.WeatherData;
+
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,14 +28,16 @@ public class WeatherService {
     private String apiUrl;
 
     // @Cacheable(value = "weather", key = "#lat + '_' + #lon")
+    @CircuitBreaker(name = "weather-api", fallbackMethod = "getDefaultWeather")
+    @Retry(name = "weather-api")
     public WeatherData fetchWeather(Double lat, Double lon) {
         try {
             String url = String.format("%s?lat=%s&lon=%s&appid=%s&units=metric",
                     apiUrl, lat, lon, apiKey);
-            
+
             log.info("Fetching weather for lat={}, lon={}", lat, lon);
             String response = restTemplate.getForObject(url, String.class);
-            
+
             return parseWeatherResponse(response);
         } catch (Exception e) {
             log.error("Failed to fetch weather data: {}", e.getMessage());
@@ -43,16 +48,16 @@ public class WeatherService {
 
     private WeatherData parseWeatherResponse(String json) throws Exception {
         JsonNode root = objectMapper.readTree(json);
-        
+
         WeatherData data = new WeatherData();
-        
+
         // Main weather info
         JsonNode main = root.get("main");
         if (main != null) {
             data.setTemperature(main.get("temp").asDouble());
             data.setHumidity(main.get("humidity").asInt());
         }
-        
+
         // Weather condition
         JsonNode weather = root.get("weather");
         if (weather != null && weather.isArray() && weather.size() > 0) {
@@ -60,19 +65,19 @@ public class WeatherService {
             data.setWeatherCondition(first.get("main").asText());
             data.setDescription(first.get("description").asText());
         }
-        
+
         // Wind
         JsonNode wind = root.get("wind");
         if (wind != null) {
             data.setWindSpeed(wind.get("speed").asDouble());
         }
-        
+
         // Visibility
         JsonNode visibility = root.get("visibility");
         if (visibility != null) {
             data.setVisibility(visibility.asDouble());
         }
-        
+
         // Rain/Snow
         double precipitation = 0.0;
         if (root.has("rain") && root.get("rain").has("1h")) {
@@ -82,7 +87,7 @@ public class WeatherService {
             precipitation += root.get("snow").get("1h").asDouble();
         }
         data.setPrecipitation(precipitation);
-        
+
         return data;
     }
 
@@ -96,5 +101,11 @@ public class WeatherService {
         data.setHumidity(50);
         data.setDescription("Weather data unavailable");
         return data;
+    }
+
+    // Fallback method
+    private WeatherData getDefaultWeather(Double lat, Double lon, Exception ex) {
+        log.warn("Weather API failed, using fallback: {}", ex.getMessage());
+        return createDefaultWeather();
     }
 }

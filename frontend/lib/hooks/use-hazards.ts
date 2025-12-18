@@ -37,7 +37,7 @@ export function useHazards() {
       days: number = 7
     ) => {
       try {
-        const response = await fetch("/api/hazard/get-history", {
+        const response = await fetch("/api/hazards/get-history", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

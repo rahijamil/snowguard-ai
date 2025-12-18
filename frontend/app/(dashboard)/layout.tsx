@@ -1,6 +1,12 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { useAccessibility } from "@/lib/hooks/use-accessibility";
 import Navbar from "@/components/shared/navbar";
 import Sidebar from "@/components/shared/sidebar";
-import { Loader2 } from "lucide-react";
+import AccessibilityControls from "@/components/shared/accessibility-controls";
 import { Toaster } from "@/components/ui/sonner";
 
 export default function DashboardLayout({
@@ -8,16 +14,12 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // if (isLoading) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-  //       <div className="text-center">
-  //         <Loader2 className="h-8 w-8 animate-spin text-sky-500 mx-auto mb-4" />
-  //         <p className="text-gray-600">Loading...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  const { isAuthenticated } = useAuth();
+  useAccessibility(); // Apply accessibility settings
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -26,6 +28,7 @@ export default function DashboardLayout({
         <Sidebar />
         <main className="flex-1 p-6 ml-64">{children}</main>
       </div>
+      <AccessibilityControls />
       <Toaster />
     </div>
   );

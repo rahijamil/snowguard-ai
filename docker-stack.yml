@@ -1,0 +1,185 @@
+version: "3.9"
+
+# ===============================================
+# CONFIGS (your .env file loaded as a swarm config)
+# ===============================================
+configs:
+  snowguard_env_vars:
+    external: true
+
+# ===============================================
+# VOLUMES
+# ===============================================
+volumes:
+  postgres-data:
+
+# ===============================================
+# NETWORKS
+# ===============================================
+networks:
+  snowguard-net:
+    driver: overlay
+    attachable: true
+
+# ===============================================
+# SERVICES
+# ===============================================
+services:
+  # ===============================================
+  # POSTGRES
+  # ===============================================
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - snowguard-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # ===============================================
+  # REDIS
+  # ===============================================
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - snowguard-net
+    deploy:
+      replicas: 1
+
+  # ===============================================
+  # CONFIG SERVICE
+  # ===============================================
+  config-service:
+    image: rahijamil/snowguard-config-service
+    environment:
+      SPRING_PROFILES_ACTIVE: native
+    volumes:
+      - ./config-repo:/app/config-repo
+    networks:
+      - snowguard-net
+    configs:
+      - source: snowguard_env_vars
+        target: /app/.env
+    deploy:
+      replicas: 1
+
+  # ===============================================
+  # DISCOVERY SERVICE
+  # ===============================================
+  discovery-service:
+    image: rahijamil/snowguard-discovery-service
+    environment:
+      EUREKA_INSTANCE_HOSTNAME: discovery-service
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    networks:
+      - snowguard-net
+    deploy:
+      replicas: 1
+
+  # ===============================================
+  # USER SERVICE
+  # ===============================================
+  user-service:
+    image: rahijamil/snowguard-user-service
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-service:8888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/userdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    networks:
+      - snowguard-net
+    configs:
+      - source: snowguard_env_vars
+        target: /app/.env
+    deploy:
+      replicas: 1
+
+  # ===============================================
+  # HAZARD SERVICE
+  # ===============================================
+  hazard-service:
+    image: rahijamil/snowguard-hazard-service
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-service:8888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hazarddb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    env_file:
+      - .env
+    networks:
+      - snowguard-net
+    configs:
+      - source: snowguard_env_vars
+        target: /app/.env
+    deploy:
+      replicas: 1
+
+  # ===============================================
+  # AI SERVICE
+  # ===============================================
+  ai-service:
+    image: rahijamil/snowguard-ai-service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aidb
+      USER_SERVICE_URL: http://user-service:8081
+      HAZARD_SERVICE_URL: http://hazard-service:8082
+    networks:
+      - snowguard-net
+    configs:
+      - source: snowguard_env_vars
+        target: /app/.env
+    deploy:
+      replicas: 1
+
+  # ===============================================
+  # NOTIFICATION SERVICE
+  # ===============================================
+  notification-service:
+    image: rahijamil/snowguard-notification-service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/notificationdb
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      USER_SERVICE_URL: http://user-service:8081
+      HAZARD_SERVICE_URL: http://hazard-service:8082
+    networks:
+      - snowguard-net
+    configs:
+      - source: snowguard_env_vars
+        target: /app/.env
+    deploy:
+      replicas: 1
+
+  # ===============================================
+  # API GATEWAY
+  # ===============================================
+  api-gateway:
+    image: rahijamil/snowguard-api-gateway
+    environment:
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-service:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    ports:
+      - "8000:8000"
+    networks:
+      - snowguard-net
+    configs:
+      - source: snowguard_env_vars
+        target: /app/.env
+    deploy:
+      replicas: 1

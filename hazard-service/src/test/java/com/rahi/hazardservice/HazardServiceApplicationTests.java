@@ -1,4 +1,4 @@
-package com.rahi.hazard_service;
+package com.rahi.hazardservice;
 
 // import org.junit.jupiter.api.Test;
 // import org.springframework.boot.test.context.SpringBootTest;

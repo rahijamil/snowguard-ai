@@ -12,6 +12,7 @@ psql $DATABASE_URL << EOF
 CREATE SCHEMA IF NOT EXISTS userschema;
 CREATE SCHEMA IF NOT EXISTS hazardschema;
 CREATE SCHEMA IF NOT EXISTS aischema;
+CREATE SCHEMA IF NOT EXISTS notificationschema;
 
 -- List all schemas
 \dn

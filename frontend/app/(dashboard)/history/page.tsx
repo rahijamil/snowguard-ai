@@ -38,6 +38,7 @@ import {
   formatDistance,
   formatDuration,
 } from "@/lib/utils/formatters";
+import { historyApi } from "@/lib/api/history";
 
 interface HazardHistoryItem {
   id: number;
@@ -118,20 +119,7 @@ export default function HistoryPage() {
 
     try {
       // Call route history endpoint
-      const response = await fetch(
-        `/api/routes/history?userId=${user.id}&days=${days}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch route history");
-      }
-
-      const data = await response.json();
+      const data = await historyApi.getRouteHistory(user.id, parseInt(days));
       setRouteHistory(data);
     } catch (error: any) {
       console.error("Route history error:", error);

@@ -1,3 +1,4 @@
+// ===== components/map/map-container.tsx (UPDATED) =====
 "use client";
 
 import {
@@ -5,10 +6,11 @@ import {
   TileLayer,
   Marker,
   Popup,
+  Polyline,
   useMap,
 } from "react-leaflet";
 import { Icon, divIcon } from "leaflet";
-import type { HazardResponse } from "@/lib/types";
+import type { HazardResponse, RouteResponse } from "@/lib/types";
 import "leaflet/dist/leaflet.css";
 
 // Fix for default marker icons
@@ -28,6 +30,7 @@ interface MapContainerProps {
   center: [number, number]; // [lng, lat]
   zoom?: number;
   hazards?: HazardResponse | null;
+  route?: RouteResponse | null;
 }
 
 function ChangeView({
@@ -46,6 +49,7 @@ export default function MapContainerReactLeaflet({
   center,
   zoom = 13,
   hazards,
+  route,
 }: MapContainerProps) {
   const getUserIcon = () => {
     return divIcon({
@@ -112,11 +116,25 @@ export default function MapContainerReactLeaflet({
       .join(" ");
   };
 
+  // Convert route path to Leaflet format [lat, lon]
+  const routePath =
+    route?.path?.map((point) => [point.lat, point.lon] as [number, number]) ||
+    [];
+
+  // Get route color based on risk score
+  const getRouteColor = (riskScore?: number): string => {
+    if (!riskScore) return "#3B82F6"; // Blue default
+    if (riskScore <= 30) return "#10B981"; // Green
+    if (riskScore <= 60) return "#F59E0B"; // Yellow
+    if (riskScore <= 80) return "#F97316"; // Orange
+    return "#EF4444"; // Red
+  };
+
   return (
     <LeafletMapContainer
       center={[center[1], center[0]]}
       zoom={zoom}
-      className="w-full h-[600px] rounded-lg"
+      className="w-full h-[600px] rounded-lg z-0"
       style={{ height: "600px", width: "100%" }}
     >
       <ChangeView center={center} zoom={zoom} />
@@ -128,12 +146,87 @@ export default function MapContainerReactLeaflet({
         maxZoom={19}
       />
 
+      {/* Route Polyline */}
+      {route && routePath.length > 0 && (
+        <Polyline
+          positions={routePath}
+          pathOptions={{
+            color: getRouteColor(route.riskScore),
+            weight: 5,
+            opacity: 0.7,
+          }}
+        />
+      )}
+
+      {/* Route Start Marker */}
+      {route && route.path && route.path.length > 0 && (
+        <Marker
+          position={[route.path[0].lat, route.path[0].lon]}
+          icon={divIcon({
+            className: "route-start-marker",
+            html: `<div style="
+              width: 32px;
+              height: 32px;
+              background-color: #10B981;
+              border: 3px solid white;
+              border-radius: 50%;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 16px;
+              color: white;
+            ">🏁</div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+          })}
+        >
+          <Popup>
+            <b>Start</b>
+          </Popup>
+        </Marker>
+      )}
+
+      {/* Route End Marker */}
+      {route && route.path && route.path.length > 0 && (
+        <Marker
+          position={[
+            route.path[route.path.length - 1].lat,
+            route.path[route.path.length - 1].lon,
+          ]}
+          icon={divIcon({
+            className: "route-end-marker",
+            html: `<div style="
+              width: 32px;
+              height: 32px;
+              background-color: #EF4444;
+              border: 3px solid white;
+              border-radius: 50%;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 16px;
+              color: white;
+            ">🎯</div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+          })}
+        >
+          <Popup>
+            <b>Destination</b>
+          </Popup>
+        </Marker>
+      )}
+
       {/* User Location Marker */}
-      <Marker position={[center[1], center[0]]} icon={getUserIcon()}>
-        <Popup>
-          <b>Your Location</b>
-        </Popup>
-      </Marker>
+      {!route && (
+        <Marker position={[center[1], center[0]]} icon={getUserIcon()}>
+          <Popup>
+            <b>Your Location</b>
+          </Popup>
+        </Marker>
+      )}
 
       {/* Hazard Markers */}
       {hazards?.hazardSummary?.map((hazard, index) => (
@@ -177,6 +270,37 @@ export default function MapContainerReactLeaflet({
                   {getSeverityLabel(hazard.severity)}
                 </span>
               </div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+
+      {/* Route Hazard Hotspots */}
+      {route?.hazardHotspots?.map((hotspot, index) => (
+        <Marker
+          key={`hotspot-${index}`}
+          position={[hotspot.lat, hotspot.lon]}
+          icon={divIcon({
+            className: "hotspot-marker",
+            html: `<div style="
+              width: 24px;
+              height: 24px;
+              background-color: #DC2626;
+              border: 2px solid white;
+              border-radius: 50%;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+              animation: pulse 2s infinite;
+            "></div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+          })}
+        >
+          <Popup>
+            <div style={{ padding: "4px" }}>
+              <b>Hazard Hotspot</b>
+              <p style={{ margin: "4px 0 0 0", fontSize: "12px" }}>
+                {hotspot.hazardType}: {hotspot.severity}
+              </p>
             </div>
           </Popup>
         </Marker>

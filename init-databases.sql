@@ -7,8 +7,10 @@
 SELECT 'CREATE DATABASE userdb' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'userdb')\gexec
 SELECT 'CREATE DATABASE hazarddb' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'hazarddb')\gexec
 SELECT 'CREATE DATABASE aidb' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'aidb')\gexec
+SELECT 'CREATE DATABASE notificationdb' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'notificationdb')\gexec
 
 -- Grant privileges
 GRANT ALL PRIVILEGES ON DATABASE userdb TO postgres;
 GRANT ALL PRIVILEGES ON DATABASE hazarddb TO postgres;
 GRANT ALL PRIVILEGES ON DATABASE aidb TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE notificationdb TO postgres;

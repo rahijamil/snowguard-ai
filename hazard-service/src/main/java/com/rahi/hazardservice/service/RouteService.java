@@ -10,7 +10,10 @@ import com.rahi.hazardservice.repository.RouteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-// import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -40,20 +43,26 @@ public class RouteService {
 
     @Transactional
     public RouteResponse calculateSafeRoute(Double fromLat, Double fromLon, 
-                                           Double toLat, Double toLon, String preference) {
-        log.info("Calculating safe route from ({},{}) to ({},{})", fromLat, fromLon, toLat, toLon);
+                                           Double toLat, Double toLon, 
+                                           String preference, Long userId) {
+        log.info("Calculating safe route from ({},{}) to ({},{}) for user {}", 
+                fromLat, fromLon, toLat, toLon, userId);
         
-        // Check cache first
+        // Check cache first (user-specific if userId provided)
         Instant cacheThreshold = Instant.now().minus(10, ChronoUnit.MINUTES);
-        Optional<Route> cached = routeRepository.findRecentRoute(
-                fromLat, fromLon, toLat, toLon, cacheThreshold);
+        Optional<Route> cached = Optional.empty();
+        
+        if (userId != null) {
+            cached = routeRepository.findRecentRouteForUser(
+                    userId, fromLat, fromLon, toLat, toLon, cacheThreshold);
+        }
         
         if (cached.isPresent()) {
-            log.info("Returning cached route");
+            log.info("Returning cached route for user {}", userId);
             return buildRouteResponse(cached.get());
         }
         
-        // Fetch base route from Mapbox
+        // Fetch base route
         List<LocationDto> basePath = fetchMapboxRoute(fromLon, fromLat, toLon, toLat);
         
         // Get hazards along the route
@@ -69,9 +78,11 @@ public class RouteService {
         double distance = calculateDistance(basePath);
         int duration = estimateDuration(distance, riskScore);
         
-        // Build and save route
-        Route route = saveRoute(fromLat, fromLon, toLat, toLon, basePath, 
+        // Build and save route WITH userId
+        Route route = saveRoute(userId, fromLat, fromLon, toLat, toLon, basePath, 
                                riskScore, distance, duration, hotspots);
+        
+        log.info("Route saved successfully with ID {} for user {}", route.getId(), userId);
         
         return buildRouteResponse(route);
     }
@@ -100,19 +111,21 @@ public class RouteService {
 
     private List<LocationDto> fetchOpenRouteServiceRoute(Double fromLon, Double fromLat, 
                                                          Double toLon, Double toLat) throws Exception {
-        String url = String.format("%s?start=%s,%s&end=%s,%s",
-                routingApiUrl, fromLon, fromLat, toLon, toLat);
+        // OpenRouteService uses GeoJSON format with coordinates as [lon, lat]
+        String coordinates = String.format("%s,%s;%s,%s", fromLon, fromLat, toLon, toLat);
+        String url = String.format("%s?api_key=%s&coordinates=%s&profile=foot-walking&format=geojson",
+                routingApiUrl, routingApiKey, coordinates);
         
-        log.info("Fetching route from OpenRouteService");
+        log.info("Fetching route from OpenRouteService: {}", url);
         
-        RestTemplate template = new RestTemplate();
-        template.getInterceptors().add((request, body, execution) -> {
-            request.getHeaders().add("Authorization", routingApiKey);
-            return execution.execute(request, body);
-        });
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Accept", "application/json, application/geo+json");
+        headers.set("Content-Type", "application/json");
         
-        String response = template.getForObject(url, String.class);
-        return parseOpenRouteServiceResponse(response);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+        
+        return parseOpenRouteServiceResponse(response.getBody());
     }
 
     private List<LocationDto> parseOpenRouteServiceResponse(String json) throws Exception {
@@ -120,7 +133,7 @@ public class RouteService {
         JsonNode features = root.get("features");
         
         if (features == null || features.size() == 0) {
-            throw new RuntimeException("No routes found");
+            throw new RuntimeException("No routes found in OpenRouteService response");
         }
         
         JsonNode geometry = features.get(0).get("geometry");
@@ -128,12 +141,14 @@ public class RouteService {
         
         List<LocationDto> path = new ArrayList<>();
         for (JsonNode coord : coordinates) {
+            // OpenRouteService returns coordinates as [longitude, latitude]
             path.add(LocationDto.builder()
                     .lon(coord.get(0).asDouble())
                     .lat(coord.get(1).asDouble())
                     .build());
         }
         
+        log.info("Parsed {} points from OpenRouteService response", path.size());
         return path;
     }
 
@@ -141,6 +156,8 @@ public class RouteService {
                                                   Double toLon, Double toLat) throws Exception {
         String url = String.format("https://api.mapbox.com/directions/v5/mapbox/walking/%s,%s;%s,%s?geometries=geojson&access_token=%s",
                 fromLon, fromLat, toLon, toLat, routingApiKey);
+        
+        log.info("Fetching route from Mapbox: {}", url);
         
         String response = restTemplate.getForObject(url, String.class);
         return parseMapboxResponse(response);
@@ -151,7 +168,7 @@ public class RouteService {
         JsonNode routes = root.get("routes");
         
         if (routes == null || routes.size() == 0) {
-            throw new RuntimeException("No routes found");
+            throw new RuntimeException("No routes found in Mapbox response");
         }
         
         JsonNode geometry = routes.get(0).get("geometry");
@@ -159,12 +176,14 @@ public class RouteService {
         
         List<LocationDto> path = new ArrayList<>();
         for (JsonNode coord : coordinates) {
+            // Mapbox returns coordinates as [longitude, latitude]
             path.add(LocationDto.builder()
                     .lon(coord.get(0).asDouble())
                     .lat(coord.get(1).asDouble())
                     .build());
         }
         
+        log.info("Parsed {} points from Mapbox response", path.size());
         return path;
     }
 
@@ -182,6 +201,7 @@ public class RouteService {
                     .build());
         }
         
+        log.info("Created direct path with {} points", path.size());
         return path;
     }
 
@@ -192,19 +212,23 @@ public class RouteService {
         double minLon = path.stream().mapToDouble(LocationDto::getLon).min().orElse(0);
         double maxLon = path.stream().mapToDouble(LocationDto::getLon).max().orElse(0);
         
-        // Add buffer
-        double buffer = 0.01; // ~1km
+        // Add buffer (~1km)
+        double buffer = 0.01;
         minLat -= buffer;
         maxLat += buffer;
         minLon -= buffer;
         maxLon += buffer;
         
         Instant since = Instant.now().minus(2, ChronoUnit.HOURS);
-        return hazardRepository.findWithinBounds(minLat, maxLat, minLon, maxLon, since);
+        List<Hazard> hazards = hazardRepository.findWithinBounds(minLat, maxLat, minLon, maxLon, since);
+        
+        log.info("Found {} hazards along route path", hazards.size());
+        return hazards;
     }
 
     private int calculateRouteRiskScore(List<LocationDto> path, List<Hazard> hazards) {
         if (hazards.isEmpty()) {
+            log.info("No hazards found, risk score: 0");
             return 0;
         }
         
@@ -233,7 +257,9 @@ public class RouteService {
             }
         }
         
-        return samples > 0 ? (int) (totalRisk / samples) : 0;
+        int riskScore = samples > 0 ? (int) (totalRisk / samples) : 0;
+        log.info("Calculated risk score: {} (based on {} samples)", riskScore, samples);
+        return riskScore;
     }
 
     private List<HazardHotspot> identifyHotspots(List<LocationDto> path, List<Hazard> hazards) {
@@ -259,6 +285,7 @@ public class RouteService {
             }
         }
         
+        log.info("Identified {} hazard hotspots", hotspots.size());
         return hotspots;
     }
 
@@ -270,7 +297,9 @@ public class RouteService {
                     path.get(i + 1).getLat(), path.get(i + 1).getLon()
             );
         }
-        return total * 1000; // Convert to meters
+        double distanceMeters = total * 1000; // Convert to meters
+        log.info("Calculated route distance: {} km ({} meters)", total, distanceMeters);
+        return distanceMeters;
     }
 
     private int estimateDuration(double distanceMeters, int riskScore) {
@@ -278,11 +307,15 @@ public class RouteService {
         // Reduce speed based on risk: higher risk = slower
         double speedFactor = 1.0 - (riskScore / 200.0); // Max 50% reduction
         double effectiveSpeed = 1.4 * Math.max(0.5, speedFactor);
-        return (int) (distanceMeters / effectiveSpeed);
+        int durationSeconds = (int) (distanceMeters / effectiveSpeed);
+        
+        log.info("Estimated duration: {} seconds (distance: {}m, risk: {}, speed: {} m/s)", 
+                durationSeconds, distanceMeters, riskScore, effectiveSpeed);
+        return durationSeconds;
     }
 
     private double calculateDistanceKm(Double lat1, Double lon1, Double lat2, Double lon2) {
-        // Haversine formula
+        // Haversine formula for distance between two points
         double R = 6371; // Earth radius in km
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
@@ -293,7 +326,7 @@ public class RouteService {
         return R * c;
     }
 
-    private Route saveRoute(Double fromLat, Double fromLon, Double toLat, Double toLon,
+    private Route saveRoute(Long userId, Double fromLat, Double fromLon, Double toLat, Double toLon,
                            List<LocationDto> path, int riskScore, double distance, 
                            int duration, List<HazardHotspot> hotspots) {
         try {
@@ -301,6 +334,7 @@ public class RouteService {
             String hotspotsJson = objectMapper.writeValueAsString(hotspots);
             
             Route route = Route.builder()
+                    .userId(userId)
                     .fromLatitude(fromLat)
                     .fromLongitude(fromLon)
                     .toLatitude(toLat)
@@ -312,9 +346,13 @@ public class RouteService {
                     .hazardHotspotsJson(hotspotsJson)
                     .build();
             
-            return routeRepository.save(route);
+            Route saved = routeRepository.save(route);
+            log.info("✅ Route saved: ID={}, userId={}, from=({},{}), to=({},{}), risk={}", 
+                    saved.getId(), saved.getUserId(), fromLat, fromLon, toLat, toLon, riskScore);
+            
+            return saved;
         } catch (Exception e) {
-            log.error("Failed to save route: {}", e.getMessage());
+            log.error("Failed to save route: {}", e.getMessage(), e);
             throw new RuntimeException("Route save failed", e);
         }
     }
@@ -357,7 +395,19 @@ public class RouteService {
         }
     }
 
-    public List<Route> findRecentRoute(Instant since) {
-        return routeRepository.findRecentRoute(since);
+    // Find routes for specific user
+    public List<Route> findRoutesForUser(Long userId, Instant since) {
+        return routeRepository.findByUserIdAndCreatedAtAfter(userId, since);
+    }
+
+    // Find all recent routes
+    public List<Route> findRecentRoutes(Instant since) {
+        return routeRepository.findRecentRoutes(since);
+    }
+
+    // Delete old routes for specific user
+    @Transactional
+    public void deleteOldRoutesForUser(Long userId, Instant cutoff) {
+        routeRepository.deleteByUserIdAndCreatedAtBefore(userId, cutoff);
     }
 }

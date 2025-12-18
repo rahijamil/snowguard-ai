@@ -7,7 +7,7 @@ export const hazardsApi = {
     lon: number,
     radius: number = 5.0
   ): Promise<HazardResponse> {
-    const response = await fetch("/api/hazard/get-hazards", {
+    const response = await fetch("/api/hazards/get-hazards", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -29,7 +29,7 @@ export const hazardsApi = {
     radius: number = 5.0,
     days: number = 7
   ): Promise<any[]> {
-    const response = await fetch("/api/hazard/get-history", {
+    const response = await fetch("/api/hazards/get-history", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

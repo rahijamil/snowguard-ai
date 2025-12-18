@@ -1,5 +1,6 @@
 import { api } from "./client";
 import type { ChatRequest, ChatResponse, ChatHistoryResponse } from "../types";
+import axios from "axios";
 
 export const chatApi = {
   async sendMessage(data: ChatRequest): Promise<ChatResponse> {
@@ -24,10 +25,10 @@ export const chatApi = {
     limit: number = 10,
     offset: number = 0
   ): Promise<ChatHistoryResponse> {
-    const response = await api.get(`/api/chat/history/${userId}`, {
-      params: { limit, offset },
+    const response = await axios.get(`/api/chat/get-history`, {
+      params: { limit, offset, userId },
     });
-    return response.data;
+    return response.data.data;
   },
 
   async deleteChatHistory(

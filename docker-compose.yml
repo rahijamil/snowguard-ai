@@ -1,0 +1,293 @@
+# ===============================================
+# SnowGuard AI - Docker Compose
+# Single PostgreSQL + Redis + All Microservices With Service Discovery, Config Server, and Fault Tolerance
+# ===============================================
+
+services:
+  # ===============================================
+  # SHARED INFRASTRUCTURE
+  # ===============================================
+  postgres:
+    image: postgres:18-alpine
+    container_name: snowguard-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    networks:
+      - snowguard-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:8-alpine
+    container_name: snowguard-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - snowguard-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===============================================
+  # DISCOVERY & CONFIG
+  # ===============================================
+  discovery-service:
+    image: rahijamil/snowguard-discovery-service
+    # build: ./discovery-service
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    networks:
+      - snowguard-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  config-service:
+    image: rahijamil/snowguard-config-service
+    # build: ./config-service
+    container_name: config-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=native
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./config-repo:/app/config-repo
+    networks:
+      - snowguard-net
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ===============================================
+  # MICROSERVICES
+  # ===============================================
+  user-service:
+    image: rahijamil/snowguard-user-service
+    # build: ./user-service
+    container_name: user-service
+    env_file:
+      - .env
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/userdb
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-service:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - snowguard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  hazard-service:
+    image: rahijamil/snowguard-hazard-service
+    # build: ./hazard-service
+    container_name: hazard-service
+    env_file:
+      - .env
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hazarddb
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - ROUTING_API_KEY=${ROUTING_API_KEY}
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-service:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - snowguard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  ai-service:
+    image: rahijamil/snowguard-ai-service
+    # build: ./ai-service
+    container_name: ai-service
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/aidb
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - ENVIRONMENT=production
+      - PORT=8003
+      - LOG_LEVEL=INFO
+      - USER_SERVICE_URL=http://user-service:8081
+      - HAZARD_SERVICE_URL=http://hazard-service:8082
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      hazard-service:
+        condition: service_healthy
+    networks:
+      - snowguard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  notification-service:
+    image: rahijamil/snowguard-notification-service
+    # build: ./notification-service
+    container_name: notification-service
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=8004
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/notificationdb
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-gyjKcS5rxZFa0bh4dM5tPUfkIHvM3938ucJUmf4g+Ic=}
+      - USER_SERVICE_URL=http://user-service:8081
+      - HAZARD_SERVICE_URL=http://hazard-service:8082
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    networks:
+      - snowguard-net
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:8004/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ===============================================
+  # API GATEWAY
+  # ===============================================
+  api-gateway:
+    image: rahijamil/snowguard-api-gateway
+    # build: ./api-gateway
+    container_name: api-gateway
+    env_file:
+      - .env
+    environment:
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-gyjKcS5rxZFa0bh4dM5tPUfkIHvM3938ucJUmf4g+Ic=}
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-service:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      # Service URLs (fallback if discovery fails)
+      - USER_SERVICE_URL=http://user-service:8081
+      - HAZARD_SERVICE_URL=http://hazard-service:8082
+      - AI_SERVICE_URL=http://ai-service:8003
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8004
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      hazard-service:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    networks:
+      - snowguard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+# ===============================================
+# VOLUMES
+# ===============================================
+volumes:
+  postgres-data:
+    driver: local
+
+# ===============================================
+# NETWORKS
+# ===============================================
+networks:
+  snowguard-net:
+    driver: bridge
+    name: snowguard-network

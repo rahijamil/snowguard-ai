@@ -1,4 +1,5 @@
 import { api } from "./client";
+import { hazardsApi } from "./hazards";
 
 export interface HistoricalHazard {
   id: number;
@@ -39,18 +40,29 @@ export const historyApi = {
     radius: number = 5.0,
     days: number = 7
   ): Promise<HistoricalHazard[]> {
-    const response = await api.get("/api/hazards/history", {
-      params: { lat, lon, radius, days },
-    });
-    return response.data;
+    const response = hazardsApi.getHistory(lat, lon, radius, days);
+    return response;
   },
 
   // Fetch route history
-  async getRouteHistory(limit: number = 20): Promise<HistoricalRoute[]> {
-    const response = await api.get("/api/route/history", {
-      params: { limit },
+  async getRouteHistory(
+    userId: number,
+    days: number = 20
+  ): Promise<HistoricalRoute[]> {
+    const response = await fetch("/api/routes/history", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ userId, days }),
     });
-    return response.data;
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Hazard History failed");
+    }
+
+    return await response.json();
   },
 
   // Fetch chat history

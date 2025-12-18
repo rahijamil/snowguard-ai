@@ -120,7 +120,7 @@ export interface ChatHistoryItem {
   created_at: string;
   model_used: string;
   tokens_used?: number;
-  metadata?: {
+  chat_metadata?: {
     confidence?: number;
     warnings?: string[];
     suggestions?: string[];

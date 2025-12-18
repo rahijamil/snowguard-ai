@@ -1,0 +1,148 @@
+# config-repo/api-gateway.yml
+# ===============================================
+# SnowGuard AI - API Gateway Configuration
+# ===============================================
+
+server:
+  port: 8000
+
+spring:
+  application:
+    name: api-gateway
+
+  data:
+    # Redis Configuration for Rate Limiting
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+
+  # Cloud Gateway Configuration
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+
+      # Global CORS configuration
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOrigins:
+              - "http://localhost:3000"
+              - "http://localhost:8000"
+              - "http://frontend:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+              - PATCH
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+      # Default filters applied to all routes
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+
+      # Circuit Breaker configuration
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 30s
+
+# ===============================================
+# Downstream Service URLs
+# ===============================================
+services:
+  user-service:
+    url: ${USER_SERVICE_URL:http://user-service:8081}
+
+  hazard-service:
+    url: ${HAZARD_SERVICE_URL:http://hazard-service:8082}
+
+  ai-service:
+    url: ${AI_SERVICE_URL:http://ai-service:8003}
+
+  notification-service:
+    url: ${NOTIFICATION_SERVICE_URL:http://notification-service:8004}
+
+# ===============================================
+# JWT Configuration
+# ===============================================
+jwt:
+  secret: ${JWT_SECRET:gyjKcS5rxZFa0bh4dM5tPUfkIHvM3938ucJUmf4g+Ic=}
+
+# ===============================================
+# Resilience4j Circuit Breaker
+# ===============================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      user-service:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 30s
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 100
+        slow-call-duration-threshold: 5s
+
+      hazard-service:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+
+      ai-service:
+        sliding-window-size: 5
+        minimum-number-of-calls: 3
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 60s
+
+      notification-service:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+
+  timelimiter:
+    instances:
+      default:
+        timeout-duration: 10s
+
+      ai-service:
+        timeout-duration: 30s # AI requests may take longer
+
+  retry:
+    instances:
+      default:
+        max-attempts: 3
+        wait-duration: 1s
+# ===============================================
+# Actuator Configuration
+# ===============================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+
+# ===============================================
+# Logging Configuration
+# ===============================================
+logging:
+  level:
+    root: INFO
+    com.rahi.apigateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
