@@ -43,6 +43,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
             }
 
             String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            log.debug("Received Authorization header: {}", authHeader);
             
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 log.warn("Invalid Authorization header format for path: {}", path);
@@ -56,8 +57,8 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                 Claims claims = jwtUtil.validateToken(token);
                 
                 String email = claims.getSubject();
-Integer userIdInt = claims.get("uid", Integer.class);
-String userId = (userIdInt != null) ? userIdInt.toString() : null;
+                Long userIdLong = claims.get("uid", Long.class);
+                String userId = (userIdLong != null) ? userIdLong.toString() : null;
 
                 log.info("✅ Authenticated request for user: {} (ID: {}) to {}", email, userId, path);
 

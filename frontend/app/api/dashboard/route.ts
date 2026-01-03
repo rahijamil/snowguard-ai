@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
     const lon = searchParams.get("lon");
     const radius = searchParams.get("radius");
     const authToken = request.cookies.get("auth-token")?.value;
+    const userIdHeader = request.headers.get("X-User-Id");
+    console.log("Next.js API Route: Received X-User-Id header:", userIdHeader);
 
     // Build the URL for the backend API
     const backendUrl = `${API_URL}/api/dashboard`;
@@ -23,6 +25,10 @@ export async function GET(request: NextRequest) {
 
     if (authToken) {
       headers["Authorization"] = `Bearer ${authToken}`;
+    }
+
+    if (userIdHeader) {
+      headers["X-User-Id"] = userIdHeader;
     }
 
     // Forward request to backend using axios

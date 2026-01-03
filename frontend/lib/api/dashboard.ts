@@ -6,6 +6,7 @@
 import { api } from "./client";
 import type { HazardResponse } from "../types";
 import axios from "axios";
+import { useAuthStore } from "../store/auth-store";
 
 export interface DashboardData {
   userId: number;
@@ -31,9 +32,13 @@ export const dashboardApi = {
     lon: number,
     radius: number = 5.0
   ): Promise<DashboardData> {
+    const user = useAuthStore.getState().user;
+    console.log("Dashboard API: User from store:", user);
+    console.log("Dashboard API: User ID:", user?.id);
     const response = await axios("/api/dashboard", {
       headers: {
         "Content-Type": "application/json",
+        ...(user?.id ? { "X-User-Id": user.id.toString() } : {}),
       },
       params: { lat, lon, radius },
     });
@@ -45,9 +50,13 @@ export const dashboardApi = {
    * Get quick dashboard data (reduced radius for faster response)
    */
   async getQuickDashboard(lat: number, lon: number): Promise<DashboardData> {
+    const user = useAuthStore.getState().user;
+    console.log("Quick Dashboard API: User from store:", user);
+    console.log("Quick Dashboard API: User ID:", user?.id);
     const response = await axios("/api/dashboard/quick", {
       headers: {
         "Content-Type": "application/json",
+        ...(user?.id ? { "X-User-Id": user.id.toString() } : {}),
       },
       params: { lat, lon },
     });

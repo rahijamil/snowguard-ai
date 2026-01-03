@@ -42,11 +42,11 @@ class NotificationService {
 
       const { token } = await response.json();
 
-      const NOTIFICATION_URL =
-        `${process.env.NEXT_PUBLIC_API_URL}/api/notifications` ||
-        "http://localhost:8000/api/notifications";
+      const NOTIFICATION_SERVER_URL =
+        process.env.NEXT_PUBLIC_NOTIFICATION_SERVER_URL ||
+        "http://localhost:8004";
 
-      this.socket = io(NOTIFICATION_URL, {
+      this.socket = io(NOTIFICATION_SERVER_URL, {
         auth: { token },
         transports: ["websocket", "polling"],
         reconnection: true,

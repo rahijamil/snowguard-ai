@@ -33,11 +33,11 @@ public class DashboardAggregationService {
     @Value("${services.ai-service.url}")
     private String aiServiceUrl;
 
-    public Mono<DashboardResponse> aggregateDashboardData(Long userId, Double lat, Double lon, Double radius) {
+    public Mono<DashboardResponse> aggregateDashboardData(Long userId, Double lat, Double lon, Double radius, String authorizationHeader) {
         log.info("🔄 Aggregating dashboard data for user {} at ({}, {})", userId, lat, lon);
 
         // Parallel calls to all three services
-        Mono<JsonNode> userMono = fetchUserData(userId);
+        Mono<JsonNode> userMono = fetchUserData(userId, authorizationHeader);
         Mono<JsonNode> hazardMono = fetchHazardData(lat, lon, radius);
         Mono<JsonNode> suggestionMono = fetchAISuggestions(lat, lon);
 
@@ -74,11 +74,16 @@ public class DashboardAggregationService {
                 });
     }
 
-    private Mono<JsonNode> fetchUserData(Long userId) {
+    private Mono<JsonNode> fetchUserData(Long userId, String authorizationHeader) {
         WebClient client = webClientBuilder.baseUrl(userServiceUrl).build();
         
         return client.get()
                 .uri("/api/users/me")
+                .headers(headers -> {
+                    if (authorizationHeader != null && !authorizationHeader.isEmpty()) {
+                        headers.set("Authorization", authorizationHeader);
+                    }
+                })
                 .retrieve()
                 .bodyToMono(JsonNode.class)
                 .timeout(Duration.ofSeconds(5))

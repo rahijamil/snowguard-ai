@@ -25,11 +25,19 @@ public class DashboardController {
             @RequestParam(required = true) Double lat,
             @RequestParam(required = true) Double lon,
             @RequestParam(defaultValue = "5.0") Double radius,
-            @RequestHeader("X-User-Id") String userId) {
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
         
+        if (userId == null) {
+            log.warn("⚠️ Dashboard request missing X-User-Id header");
+            // For now, return unauthorized or handle appropriately. 
+            // In a real scenario, this should probably come from the security context or token.
+             return Mono.just(ResponseEntity.status(401).build());
+        }
+
         log.info("📊 Dashboard request for user {} at location ({}, {})", userId, lat, lon);
         
-        return dashboardService.aggregateDashboardData(Long.parseLong(userId), lat, lon, radius)
+        return dashboardService.aggregateDashboardData(Long.parseLong(userId), lat, lon, radius, authorizationHeader)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.internalServerError().build());
     }
@@ -38,12 +46,18 @@ public class DashboardController {
     public Mono<ResponseEntity<DashboardResponse>> getQuickDashboard(
             @RequestParam(required = true) Double lat,
             @RequestParam(required = true) Double lon,
-            @RequestHeader("X-User-Id") String userId) {
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
         
+        if (userId == null) {
+            log.warn("⚠️ Quick dashboard request missing X-User-Id header");
+             return Mono.just(ResponseEntity.status(401).build());
+        }
+
         log.info("⚡ Quick dashboard request for user {} at ({}, {})", userId, lat, lon);
         
         // Quick dashboard with reduced data
-        return dashboardService.aggregateDashboardData(Long.parseLong(userId), lat, lon, 2.0)
+        return dashboardService.aggregateDashboardData(Long.parseLong(userId), lat, lon, 2.0, authorizationHeader)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.internalServerError().build());
     }

@@ -59,8 +59,6 @@ services:
   # ===============================================
   config-service:
     image: rahijamil/snowguard-config-service
-    environment:
-      SPRING_PROFILES_ACTIVE: native
     volumes:
       - ./config-repo:/app/config-repo
     networks:
@@ -70,6 +68,16 @@ services:
         target: /app/.env
     deploy:
       replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   # ===============================================
   # DISCOVERY SERVICE
@@ -83,6 +91,16 @@ services:
       - snowguard-net
     deploy:
       replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   # ===============================================
   # USER SERVICE
@@ -104,6 +122,16 @@ services:
         target: /app/.env
     deploy:
       replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   # ===============================================
   # HAZARD SERVICE
@@ -127,6 +155,16 @@ services:
         target: /app/.env
     deploy:
       replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/api/hazards/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   # ===============================================
   # AI SERVICE
@@ -169,6 +207,7 @@ services:
   # ===============================================
   api-gateway:
     image: rahijamil/snowguard-api-gateway
+    # build: ./api-gateway
     environment:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
@@ -183,3 +222,13 @@ services:
         target: /app/.env
     deploy:
       replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/gateway/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s

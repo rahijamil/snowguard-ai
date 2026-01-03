@@ -235,7 +235,7 @@ services:
   # ===============================================
   api-gateway:
     image: rahijamil/snowguard-api-gateway
-    # build: ./api-gateway
+    build: ./api-gateway
     container_name: api-gateway
     env_file:
       - .env

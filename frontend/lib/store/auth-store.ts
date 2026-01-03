@@ -60,7 +60,17 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "snowguard-auth",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        // Return a no-op storage object for server-side rendering
+        if (typeof window === "undefined") {
+          return {
+            getItem: () => null,
+            setItem: () => undefined,
+            removeItem: () => undefined,
+          };
+        }
+        return localStorage;
+      }),
       // Only persist user and preferences, not token
       partialize: (state) => ({
         user: state.user,

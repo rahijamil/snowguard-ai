@@ -16,6 +16,9 @@ const { setupSocketHandlers } = require("./services/socket-handler");
 dotenv.config();
 
 const app = express();
+// Enable proxy trust for rate limiting behind a reverse proxy/load balancer
+app.set('trust proxy', 1);
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
